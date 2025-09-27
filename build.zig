@@ -20,6 +20,8 @@ pub fn build(b: *std.Build) void {
     // fastfetch include dirs
     exe.root_module.addIncludePath(b.path("fastfetch/src"));
     exe.root_module.addIncludePath(b.path("src/ff_config"));
+    // shim includes (e.g. Windows.h case-insensitive bridge for cross-compiles)
+    exe.root_module.addIncludePath(b.path("src/ff_shim"));
 
     // Collect minimal set of fastfetch sources we need for terminal + font detection
     const common_sources: []const []const u8 = &.{

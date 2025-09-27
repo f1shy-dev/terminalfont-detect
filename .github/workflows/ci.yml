@@ -26,7 +26,7 @@ jobs:
         with:
           version: 0.15.1
 
-      - name: Build linux and windows targets
+      - name: Build linux targets
         shell: bash
         run: |
           set -euxo pipefail
@@ -47,18 +47,6 @@ jobs:
             cp zig-out/bin/terminalfont-detect* "$outdir/"
           done
 
-          # Cross-compile Windows (GNU) targets
-          for target in x86_64-windows-gnu aarch64-windows-gnu; do
-            rm -rf zig-out
-            bunx --yes zig build -Doptimize=ReleaseFast -Dtarget=$target
-            case "$target" in
-              aarch64-*) arch=aarch64 ;;
-              *) arch=x86_64 ;;
-            esac
-            outdir="dist/windows-$arch"
-            mkdir -p "$outdir"
-            cp zig-out/bin/terminalfont-detect* "$outdir/"
-          done
 
       - name: Upload linux x86_64
         uses: actions/upload-artifact@v4
@@ -135,11 +123,48 @@ jobs:
           name: terminalfont-detect-${{ steps.names.outputs.os_name }}-${{ steps.names.outputs.arch_name }}
           path: zig-out/bin/terminalfont-detect*
 
+  build-windows:
+    name: build windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Zig 0.15.1
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+
+      - name: Build (Release)
+        shell: bash
+        run: |
+          bunx --yes zig build -Doptimize=ReleaseFast
+
+      - name: Derive artifact name
+        id: names
+        shell: bash
+        run: |
+          echo "os_name=windows" >> $GITHUB_OUTPUT
+          echo "arch_name=$(uname -m)" >> $GITHUB_OUTPUT
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-${{ steps.names.outputs.os_name }}-${{ steps.names.outputs.arch_name }}
+          path: zig-out/bin/terminalfont-detect*
+
 
   pack:
     name: pack npm
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos]
+    needs: [build-linux, build-macos, build-windows]
     environment: main
     
     steps:
