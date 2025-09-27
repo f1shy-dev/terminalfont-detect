@@ -14,14 +14,44 @@ function mapPlatformToNpm(p) {
   return p;
 }
 
+function detectLibc() {
+  if (platform === "linux") {
+    try {
+      const { GLIBC } = require("glibc-version") || {};
+      if (GLIBC) return "gnu";
+    } catch (_) {}
+    try {
+      // musl environments often have musl in ldd output
+      const { execSync } = require("child_process");
+      const out = execSync("ldd --version || true", {
+        stdio: ["ignore", "pipe", "ignore"],
+      }).toString();
+      if (/musl/i.test(out)) return "musl";
+    } catch (_) {}
+    // default to gnu if unsure
+    return "gnu";
+  }
+  return "";
+}
+
 function tryRequirePlatformPackage() {
   const os = mapPlatformToNpm(platform);
   const cpu = mapArchToNpm(arch());
-  const name = `@vishyfishy2/terminalfont-detect-${os}-${cpu}`;
+  const libc = os === "linux" ? detectLibc() : "";
+  const base = `@vishyfishy2/terminalfont-detect-${os}-${cpu}`;
+  const name = libc ? `${base}-${libc}` : base;
   try {
     const mod = require(name);
     if (mod && mod.binaryPath) return mod.binaryPath;
   } catch (_) {}
+  // try fallback to gnu if musl not found (or vice versa)
+  if (os === "linux") {
+    const alt = libc === "musl" ? `${base}-gnu` : `${base}-musl`;
+    try {
+      const mod = require(alt);
+      if (mod && mod.binaryPath) return mod.binaryPath;
+    } catch (_) {}
+  }
   return null;
 }
 

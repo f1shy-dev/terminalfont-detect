@@ -44,7 +44,6 @@ pub fn build(b: *std.Build) void {
         // platform
         "fastfetch/src/util/platform/FFPlatform.c",
         // utils
-        "fastfetch/src/util/FFstrbuf.c",
         "fastfetch/src/util/FFlist.c",
         "fastfetch/src/util/path.c",
         "fastfetch/src/util/base64.c",
@@ -65,6 +64,14 @@ pub fn build(b: *std.Build) void {
         "fastfetch/src/common/font.c",
     };
     inline for (common_sources) |path| exe.root_module.addCSourceFile(.{ .file = b.path(path), .flags = &.{} });
+
+    // Ensure vasprintf is declared on Windows without editing vendored sources.
+    // We force-include our minimal declaration header for FFstrbuf.c only on Windows.
+    if (target.result.os.tag == .windows) {
+        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/FFstrbuf.c"), .flags = &.{ "-include", "src/ff_shim/win_compat.h" } });
+    } else {
+        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/FFstrbuf.c"), .flags = &.{} });
+    }
 
     // Add our stubs
     exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/logo_print_stub.c"), .flags = &.{} });
@@ -91,11 +98,17 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .macos) {
         // Objective-C sources
         if (apple_sdk) |sdk| {
-            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk} });
-            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk} });
+            const sdk_frameworks = b.pathJoin(&.{ sdk, "System/Library/Frameworks" });
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk, "-F", sdk_frameworks} });
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk, "-F", sdk_frameworks} });
+            // Ensure framework search path uses the provided SDK, not host paths
+            exe.addFrameworkPath(.{ .cwd_relative = sdk_frameworks });
         } else {
             exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc"} });
             exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc"} });
+            // Fallback to default system framework locations on developer machines
+            exe.addFrameworkPath(.{ .cwd_relative = "/System/Library/Frameworks" });
+            exe.addFrameworkPath(.{ .cwd_relative = "/Library/Frameworks" });
         }
         // binary extractor impl for Apple
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/binary_apple.c"), .flags = &.{} });
@@ -104,9 +117,6 @@ pub fn build(b: *std.Build) void {
         exe.linkFramework("Foundation");
         exe.linkFramework("AppKit");
         exe.linkFramework("CoreData");
-        // Ensure framework search paths are available for Zig 0.15 cross-targets
-        exe.addFrameworkPath(.{ .cwd_relative = "/System/Library/Frameworks" });
-        exe.addFrameworkPath(.{ .cwd_relative = "/Library/Frameworks" });
     } else if (target.result.os.tag == .windows) {
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_windows.c"), .flags = &.{} });
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/windows/unicode.c"), .flags = &.{} });
@@ -160,7 +170,9 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addCMacro("ZIG_REPRODUCIBLE_BUILD", "0");
 
     // Debug defines for macOS Clang if useful
-    exe.root_module.addCMacro("_DARWIN_C_SOURCE", "1");
+    if (target.result.os.tag == .macos) {
+        exe.root_module.addCMacro("_DARWIN_C_SOURCE", "1");
+    }
 
     // libc
     exe.linkLibC();

@@ -7,14 +7,98 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build:
-    name: build ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+  build-linux:
+    name: build linux (x86_64, aarch64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Zig 0.15.1
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+
+      - name: Build linux and windows targets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf dist
+          mkdir -p dist
+          # Build glibc and musl Linux targets
+          for target in x86_64-linux-gnu aarch64-linux-gnu x86_64-linux-musl aarch64-linux-musl; do
+            rm -rf zig-out
+            bunx --yes zig build -Doptimize=ReleaseFast -Dtarget=$target
+            case "$target" in
+              aarch64-*) arch=aarch64 ;;
+              *) arch=x86_64 ;;
+            esac
+            libc=""
+            if [[ "$target" == *-musl ]]; then libc="-musl"; fi
+            outdir="dist/linux-$arch$libc"
+            mkdir -p "$outdir"
+            cp zig-out/bin/terminalfont-detect* "$outdir/"
+          done
+
+          # Cross-compile Windows (GNU) targets
+          for target in x86_64-windows-gnu aarch64-windows-gnu; do
+            rm -rf zig-out
+            bunx --yes zig build -Doptimize=ReleaseFast -Dtarget=$target
+            case "$target" in
+              aarch64-*) arch=aarch64 ;;
+              *) arch=x86_64 ;;
+            esac
+            outdir="dist/windows-$arch"
+            mkdir -p "$outdir"
+            cp zig-out/bin/terminalfont-detect* "$outdir/"
+          done
+
+      - name: Upload linux x86_64
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-linux-x86_64
+          path: dist/linux-x86_64/*
+
+      - name: Upload linux aarch64
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-linux-aarch64
+          path: dist/linux-aarch64/*
+
+      - name: Upload linux x86_64 musl
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-linux-x86_64-musl
+          path: dist/linux-x86_64-musl/*
+
+      - name: Upload linux aarch64 musl
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-linux-aarch64-musl
+          path: dist/linux-aarch64-musl/*
+
+      - name: Upload windows x86_64
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-windows-x86_64
+          path: dist/windows-x86_64/*
+
+      - name: Upload windows aarch64
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-windows-aarch64
+          path: dist/windows-aarch64/*
+
+  build-macos:
+    name: build macos
+    runs-on: macos-latest
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v4
@@ -34,39 +118,28 @@ jobs:
       - name: Build (Release)
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
-            SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
-            bunx --yes zig build -Doptimize=ReleaseFast -Dapple_sdk="$SDKROOT"
-          else
-            bunx --yes zig build -Doptimize=ReleaseFast
-          fi
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+          SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          bunx --yes zig build -Doptimize=ReleaseFast -Dapple_sdk="$SDKROOT"
 
       - name: Derive artifact name
         id: names
         shell: bash
         run: |
-          OS=${{ runner.os }}
-          case "$OS" in
-            macOS) os_name=macos ;;
-            Linux) os_name=linux ;;
-            Windows) os_name=windows ;;
-          esac
-          arch_name=$(uname -m)
-          echo "os_name=$os_name" >> $GITHUB_OUTPUT
-          echo "arch_name=$arch_name" >> $GITHUB_OUTPUT
+          echo "os_name=macos" >> $GITHUB_OUTPUT
+          echo "arch_name=$(uname -m)" >> $GITHUB_OUTPUT
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: terminalfont-detect-${{ steps.names.outputs.os_name }}-${{ steps.names.outputs.arch_name }}
-          path: |
-            zig-out/bin/terminalfont-detect*
+          path: zig-out/bin/terminalfont-detect*
+
 
   pack:
     name: pack npm
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-linux, build-macos]
     environment: main
     
     steps:
@@ -86,25 +159,42 @@ jobs:
           mkdir -p npm/pkgs
           for a in artifacts/*; do
             base=$(basename "$a")
-            os=; cpu=; suf=""
+            os=; cpu=; libc=""; suf=""
             if [[ "$base" == *macos* ]]; then os=darwin; fi
             if [[ "$base" == *linux* ]]; then os=linux; fi
             if [[ "$base" == *windows* || "$base" == *win* ]]; then os=win32; suf=".exe"; fi
             if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then cpu=arm64; else cpu=x64; fi
-            pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu"
+            if [[ "$os" == linux ]]; then
+              if [[ "$base" == *musl* ]]; then libc=musl; else libc=gnu; fi
+              pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu-$libc"
+            else
+              pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu"
+            fi
             mkdir -p "$pkgdir/bin"
             # package.json
             cat > "$pkgdir/package.json" <<'JSON'
           {
-            "name": "@vishyfishy2/terminalfont-detect-$os-$cpu",
+            "name": "@vishyfishy2/terminalfont-detect-$os-$cpu$libcsuffix",
             "version": "0.1.0",
-            "description": "terminalfont-detect prebuilt binary ($os-$cpu)",
+            "description": "terminalfont-detect prebuilt binary ($os-$cpu$libcdesc)",
             "license": "MIT",
             "os": ["$os"],
             "cpu": ["$cpu"],
             "files": ["bin/"]
           }
           JSON
+            if [[ "$os" == linux ]]; then
+              # update the placeholders for libc in name/description
+              if [[ "$libc" == musl ]]; then
+                libcsuffix="-musl"; libcdesc="-musl";
+              else
+                libcsuffix="-gnu"; libcdesc="-gnu";
+              fi
+              sed -i.bak "s/\\$libcsuffix/$libcsuffix/g; s/\\$libcdesc/$libcdesc/g" "$pkgdir/package.json" && rm -f "$pkgdir/package.json.bak"
+            else
+              libcsuffix=""; libcdesc="";
+              sed -i.bak "s/\\$libcsuffix//g; s/\\$libcdesc//g" "$pkgdir/package.json" && rm -f "$pkgdir/package.json.bak"
+            fi
             # place binary
             cp "$a"/terminalfont-detect* "$pkgdir/bin/terminalfont-detect$suf"
           done
