@@ -94,17 +94,17 @@ jobs:
             pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu"
             mkdir -p "$pkgdir/bin"
             # package.json
-            cat > "$pkgdir/package.json" <<JSON
-{
-  "name": "@vishyfishy2/terminalfont-detect-$os-$cpu",
-  "version": "0.1.0",
-  "description": "terminalfont-detect prebuilt binary ($os-$cpu)",
-  "license": "MIT",
-  "os": ["$os"],
-  "cpu": ["$cpu"],
-  "files": ["bin/"]
-}
-JSON
+            cat > "$pkgdir/package.json" <<'JSON'
+          {
+            "name": "@vishyfishy2/terminalfont-detect-$os-$cpu",
+            "version": "0.1.0",
+            "description": "terminalfont-detect prebuilt binary ($os-$cpu)",
+            "license": "MIT",
+            "os": ["$os"],
+            "cpu": ["$cpu"],
+            "files": ["bin/"]
+          }
+          JSON
             # place binary
             cp "$a"/terminalfont-detect* "$pkgdir/bin/terminalfont-detect$suf"
           done
@@ -153,5 +153,3 @@ JSON
           done
           # Publish meta package
           (cd npm/package && npm publish --access public)
-
-
