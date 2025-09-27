@@ -72,17 +72,7 @@ jobs:
           name: terminalfont-detect-linux-aarch64-musl
           path: dist/linux-aarch64-musl/*
 
-      - name: Upload windows x86_64
-        uses: actions/upload-artifact@v4
-        with:
-          name: terminalfont-detect-windows-x86_64
-          path: dist/windows-x86_64/*
-
-      - name: Upload windows aarch64
-        uses: actions/upload-artifact@v4
-        with:
-          name: terminalfont-detect-windows-aarch64
-          path: dist/windows-aarch64/*
+      # Windows artifacts are uploaded by the windows job
 
   build-macos:
     name: build macos
@@ -196,32 +186,27 @@ jobs:
               pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu"
             fi
             mkdir -p "$pkgdir/bin"
-            # package.json
-            cat > "$pkgdir/package.json" <<'JSON'
-          {
-            "name": "@vishyfishy2/terminalfont-detect-$os-$cpu$libcsuffix",
-            "version": "0.1.0",
-            "description": "terminalfont-detect prebuilt binary ($os-$cpu$libcdesc)",
-            "license": "MIT",
-            "os": ["$os"],
-            "cpu": ["$cpu"],
-            "files": ["bin/"]
-          }
-          JSON
+
+            # Derive libc suffix/desc for metadata
+            libcsuffix=""
+            libcdesc=""
             if [[ "$os" == linux ]]; then
-              # update the placeholders for libc in name/description
-              if [[ "$libc" == musl ]]; then
-                libcsuffix="-musl"; libcdesc="-musl";
-              else
-                libcsuffix="-gnu"; libcdesc="-gnu";
-              fi
-              sed -i.bak "s/\\$libcsuffix/$libcsuffix/g; s/\\$libcdesc/$libcdesc/g" "$pkgdir/package.json" && rm -f "$pkgdir/package.json.bak"
-            else
-              libcsuffix=""; libcdesc="";
-              sed -i.bak "s/\\$libcsuffix//g; s/\\$libcdesc//g" "$pkgdir/package.json" && rm -f "$pkgdir/package.json.bak"
+              if [[ "$libc" == musl ]]; then libcsuffix="-musl"; libcdesc="-musl"; else libcsuffix="-gnu"; libcdesc="-gnu"; fi
             fi
-            # place binary
-            cp "$a"/terminalfont-detect* "$pkgdir/bin/terminalfont-detect$suf"
+
+            # Write package.json using Node to avoid heredocs confusing YAML linters
+            pkg_name="@vishyfishy2/terminalfont-detect-$os-$cpu$libcsuffix"
+            desc="terminalfont-detect prebuilt binary ($os-$cpu$libcdesc)"
+            node -e 'const fs=require("fs"); const [out,name,os,cpu,desc]=process.argv.slice(1); const pkg={name, version:"0.1.0", description:desc, license:"MIT", main:"index.js", os:[os], cpu:[cpu], files:["bin/","index.js"]}; fs.writeFileSync(out, JSON.stringify(pkg, null, 2)+"\n");' \
+              "$pkgdir/package.json" "$pkg_name" "$os" "$cpu" "$desc"
+
+            # Write tiny JS entry to expose binary path for meta package to require
+            printf '%s\n' 'const { join } = require("path");' \
+              "module.exports = { binaryPath: join(__dirname, \"bin\", \"terminalfont-detect$suf\") };" \
+              > "$pkgdir/index.js"
+
+            # Place binary (single explicit file to avoid wildcard issues)
+            cp "$a/terminalfont-detect$suf" "$pkgdir/bin/terminalfont-detect$suf"
           done
 
           # Also prepare the meta package (already in npm/package)
