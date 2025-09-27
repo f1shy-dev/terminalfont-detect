@@ -1,28 +1,46 @@
 const { join } = require("path");
 const { platform, arch } = process;
 
-function mapArch(a) {
-  if (a === "x64") return "x86_64";
-  if (a === "arm64") return "aarch64";
+function mapArchToNpm(a) {
+  if (a === "x64") return "x64";
+  if (a === "arm64") return "arm64";
   return a;
 }
 
-function mapPlatform(p) {
-  if (p === "darwin") return "macos";
-  if (p === "win32") return "windows";
+function mapPlatformToNpm(p) {
+  if (p === "darwin") return "darwin";
+  if (p === "win32") return "win32";
   if (p === "linux") return "linux";
   return p;
 }
 
-function getBinaryPath() {
-  const p = mapPlatform(platform);
-  const a = mapArch(arch());
-  const base = join(__dirname, "bin", `${p}-${a}`);
+function tryRequirePlatformPackage() {
+  const os = mapPlatformToNpm(platform);
+  const cpu = mapArchToNpm(arch());
+  const name = `@vishyfishy2/terminalfont-detect-${os}-${cpu}`;
+  try {
+    const mod = require(name);
+    if (mod && mod.binaryPath) return mod.binaryPath;
+  } catch (_) {}
+  return null;
+}
+
+function fallbackBundled() {
+  // Fallback to legacy layout if present
+  const os =
+    platform === "win32"
+      ? "windows"
+      : platform === "darwin"
+      ? "macos"
+      : "linux";
+  const cpu =
+    arch() === "x64" ? "x86_64" : arch() === "arm64" ? "aarch64" : arch();
+  const base = join(__dirname, "bin", `${os}-${cpu}`);
   const name =
-    p === "windows" ? "terminalfont-detect.exe" : "terminalfont-detect";
+    os === "windows" ? "terminalfont-detect.exe" : "terminalfont-detect";
   return join(base, name);
 }
 
-module.exports = {
-  binaryPath: getBinaryPath(),
-};
+const binaryPath = tryRequirePlatformPackage() || fallbackBundled();
+
+module.exports = { binaryPath };

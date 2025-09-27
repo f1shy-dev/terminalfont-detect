@@ -3,12 +3,16 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const apple_sdk = b.option([]const u8, "apple_sdk", "Path to macOS SDK (e.g. from xcrun --show-sdk-path)");
 
     // Executable: terminalfont-detect
     const exe = b.addExecutable(.{
         .name = "terminalfont-detect",
         .root_module = b.createModule(.{ .target = target, .optimize = optimize }),
     });
+    // Prefer smaller binaries (Zig 0.15 knobs)
+    exe.root_module.omit_frame_pointer = true;
+    exe.root_module.single_threaded = false;
 
     // Our C entry
     exe.root_module.addCSourceFile(.{ .file = b.path("src/main.c"), .flags = &.{} });
@@ -21,17 +25,21 @@ pub fn build(b: *std.Build) void {
     const common_sources: []const []const u8 = &.{
         // core
         "fastfetch/src/common/init.c",
-        "fastfetch/src/common/jsonconfig.c",
+        // "fastfetch/src/common/jsonconfig.c", // not needed for our detector; avoid pulling module registry
         "fastfetch/src/common/properties.c",
         "fastfetch/src/common/parsing.c",
         "fastfetch/src/common/option.c",
+        // "fastfetch/src/common/commandoption.c", // depends on generated datatext; not needed
         "fastfetch/src/common/format.c",
         "fastfetch/src/common/duration.c",
         "fastfetch/src/common/frequency.c",
         "fastfetch/src/common/size.c",
+        "fastfetch/src/common/time.c",
+        "fastfetch/src/common/percent.c",
         // options used by ffInitInstance()
         "fastfetch/src/options/logo.c",
-        "fastfetch/src/options/display.c",
+        // we stub display options to avoid pulling extra deps
+        // "fastfetch/src/options/display.c", // replaced by stub
         "fastfetch/src/options/general.c",
         // platform
         "fastfetch/src/util/platform/FFPlatform.c",
@@ -41,10 +49,12 @@ pub fn build(b: *std.Build) void {
         "fastfetch/src/util/path.c",
         "fastfetch/src/util/base64.c",
         "fastfetch/src/util/wcwidth.c",
+        "fastfetch/src/common/printing.c",
         // vendored yyjson implementation
         "fastfetch/src/3rdparty/yyjson/yyjson.c",
         // detection: terminal theme used during init
-        "fastfetch/src/detection/terminaltheme/terminaltheme.c",
+        // terminal theme detection: replaced by stub to reduce deps
+        // "fastfetch/src/detection/terminaltheme/terminaltheme.c",
         // detection: terminal core
         "fastfetch/src/detection/terminalshell/terminalshell.c",
         // detection: terminal font core
@@ -55,6 +65,14 @@ pub fn build(b: *std.Build) void {
         "fastfetch/src/common/font.c",
     };
     inline for (common_sources) |path| exe.root_module.addCSourceFile(.{ .file = b.path(path), .flags = &.{} });
+
+    // Add our stubs
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/logo_print_stub.c"), .flags = &.{} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/settings_stubs.c"), .flags = &.{} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/display_options_stub.c"), .flags = &.{} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/jsonconfig_stubs.c"), .flags = &.{} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/printing_line_stub.c"), .flags = &.{} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/terminaltheme_stub.c"), .flags = &.{} });
 
     // Non-Windows (Unix-like)
     if (target.result.os.tag != .windows) {
@@ -72,8 +90,13 @@ pub fn build(b: *std.Build) void {
     // Apple specifics
     if (target.result.os.tag == .macos) {
         // Objective-C sources
-        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc"} });
-        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc"} });
+        if (apple_sdk) |sdk| {
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk} });
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc", "-isysroot", sdk} });
+        } else {
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_apple.m"), .flags = &.{"-fobjc-arc"} });
+            exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/apple/osascript.m"), .flags = &.{"-fobjc-arc"} });
+        }
         // binary extractor impl for Apple
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/binary_apple.c"), .flags = &.{} });
 
@@ -89,11 +112,18 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/windows/unicode.c"), .flags = &.{} });
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/windows/registry.c"), .flags = &.{} });
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/windows/version.c"), .flags = &.{} });
+        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/windows/getline.c"), .flags = &.{} });
+        exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/util/binary_windows.c"), .flags = &.{} });
+        exe.root_module.addCSourceFile(.{ .file = b.path("src/ff_shim/win_compat.c"), .flags = &.{} });
         // Windows libs
         exe.linkSystemLibrary("advapi32");
         exe.linkSystemLibrary("user32");
         exe.linkSystemLibrary("shell32");
         exe.linkSystemLibrary("kernel32");
+        exe.linkSystemLibrary("imagehlp");
+        exe.linkSystemLibrary("ole32");
+        exe.linkSystemLibrary("secur32");
+        exe.linkSystemLibrary("version");
     } else {
         // Linux/BSD
         exe.root_module.addCSourceFile(.{ .file = b.path("fastfetch/src/detection/terminalfont/terminalfont_linux.c"), .flags = &.{} });

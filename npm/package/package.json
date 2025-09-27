@@ -7,6 +7,14 @@
   "bin": {
     "terminalfont-detect": "cli.js"
   },
+  "optionalDependencies": {
+    "@vishyfishy2/terminalfont-detect-darwin-arm64": "^0.1.0",
+    "@vishyfishy2/terminalfont-detect-darwin-x64": "^0.1.0",
+    "@vishyfishy2/terminalfont-detect-linux-x64": "^0.1.0",
+    "@vishyfishy2/terminalfont-detect-linux-arm64": "^0.1.0",
+    "@vishyfishy2/terminalfont-detect-win32-x64": "^0.1.0",
+    "@vishyfishy2/terminalfont-detect-win32-arm64": "^0.1.0"
+  },
   "files": [
     "bin/",
     "index.js",

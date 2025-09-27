@@ -33,7 +33,14 @@ jobs:
 
       - name: Build (Release)
         shell: bash
-        run: bunx --yes zig build -Doptimize=ReleaseFast
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+            SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+            bunx --yes zig build -Doptimize=ReleaseFast -Dapple_sdk="$SDKROOT"
+          else
+            bunx --yes zig build -Doptimize=ReleaseFast
+          fi
 
       - name: Derive artifact name
         id: names
@@ -75,38 +82,35 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          pkgdir=npm/package
-          mkdir -p "$pkgdir/bin"
-          # Mac
-          mkdir -p "$pkgdir/bin/macos-$(uname -m)" || true
-          # Linux
-          mkdir -p "$pkgdir/bin/linux-x86_64" "$pkgdir/bin/linux-aarch64"
-          # Windows
-          mkdir -p "$pkgdir/bin/windows-x86_64" "$pkgdir/bin/windows-aarch64"
-
-          # Move artifacts to expected locations
-          shopt -s nullglob
+          # Create platform-specific packages
+          mkdir -p npm/pkgs
           for a in artifacts/*; do
             base=$(basename "$a")
-            case "$base" in
-              *macos*)
-                # Detect arch from artifact name
-                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
-                mkdir -p "$pkgdir/bin/macos-$arch"
-                cp "$a"/* "$pkgdir/bin/macos-$arch/";
-                ;;
-              *linux*)
-                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
-                mkdir -p "$pkgdir/bin/linux-$arch"
-                cp "$a"/* "$pkgdir/bin/linux-$arch/";
-                ;;
-              *windows*)
-                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
-                mkdir -p "$pkgdir/bin/windows-$arch"
-                cp "$a"/* "$pkgdir/bin/windows-$arch/";
-                ;;
-            esac
+            os=; cpu=; suf=""
+            if [[ "$base" == *macos* ]]; then os=darwin; fi
+            if [[ "$base" == *linux* ]]; then os=linux; fi
+            if [[ "$base" == *windows* || "$base" == *win* ]]; then os=win32; suf=".exe"; fi
+            if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then cpu=arm64; else cpu=x64; fi
+            pkgdir="npm/pkgs/@vishyfishy2/terminalfont-detect-$os-$cpu"
+            mkdir -p "$pkgdir/bin"
+            # package.json
+            cat > "$pkgdir/package.json" <<JSON
+{
+  "name": "@vishyfishy2/terminalfont-detect-$os-$cpu",
+  "version": "0.1.0",
+  "description": "terminalfont-detect prebuilt binary ($os-$cpu)",
+  "license": "MIT",
+  "os": ["$os"],
+  "cpu": ["$cpu"],
+  "files": ["bin/"]
+}
+JSON
+            # place binary
+            cp "$a"/terminalfont-detect* "$pkgdir/bin/terminalfont-detect$suf"
           done
+
+          # Also prepare the meta package (already in npm/package)
+          echo done
 
       - name: List package files
         run: |
@@ -122,11 +126,32 @@ jobs:
           name: npm-tarball
           path: npm/package/*.tgz
 
+      - name: Pack platform packages
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for d in npm/pkgs/@vishyfishy2/*; do
+            (cd "$d" && npm pack)
+          done
+
+      - name: Upload platform tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarballs-platform
+          path: npm/pkgs/@vishyfishy2/**/*.tgz
+
       - name: Publish to npm (on tag)
         if: startsWith(github.ref, 'refs/tags/')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: npm/package
-        run: npm publish --access public
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # Publish platform packages first
+          for d in npm/pkgs/@vishyfishy2/*; do
+            (cd "$d" && npm publish --access public)
+          done
+          # Publish meta package
+          (cd npm/package && npm publish --access public)
 
 
