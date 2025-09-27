@@ -1,0 +1,130 @@
+name: build-and-pack
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Zig 0.15.1
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.15.1
+
+      - name: Build (Release)
+        shell: bash
+        run: bunx --yes zig build -Doptimize=ReleaseFast
+
+      - name: Derive artifact name
+        id: names
+        shell: bash
+        run: |
+          OS=${{ runner.os }}
+          case "$OS" in
+            macOS) os_name=macos ;;
+            Linux) os_name=linux ;;
+            Windows) os_name=windows ;;
+          esac
+          arch_name=$(uname -m)
+          echo "os_name=$os_name" >> $GITHUB_OUTPUT
+          echo "arch_name=$arch_name" >> $GITHUB_OUTPUT
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-${{ steps.names.outputs.os_name }}-${{ steps.names.outputs.arch_name }}
+          path: |
+            zig-out/bin/terminalfont-detect*
+
+  pack:
+    name: pack npm
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemble npm package layout
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pkgdir=npm/package
+          mkdir -p "$pkgdir/bin"
+          # Mac
+          mkdir -p "$pkgdir/bin/macos-$(uname -m)" || true
+          # Linux
+          mkdir -p "$pkgdir/bin/linux-x86_64" "$pkgdir/bin/linux-aarch64"
+          # Windows
+          mkdir -p "$pkgdir/bin/windows-x86_64" "$pkgdir/bin/windows-aarch64"
+
+          # Move artifacts to expected locations
+          shopt -s nullglob
+          for a in artifacts/*; do
+            base=$(basename "$a")
+            case "$base" in
+              *macos*)
+                # Detect arch from artifact name
+                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
+                mkdir -p "$pkgdir/bin/macos-$arch"
+                cp "$a"/* "$pkgdir/bin/macos-$arch/";
+                ;;
+              *linux*)
+                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
+                mkdir -p "$pkgdir/bin/linux-$arch"
+                cp "$a"/* "$pkgdir/bin/linux-$arch/";
+                ;;
+              *windows*)
+                if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then arch=aarch64; else arch=x86_64; fi
+                mkdir -p "$pkgdir/bin/windows-$arch"
+                cp "$a"/* "$pkgdir/bin/windows-$arch/";
+                ;;
+            esac
+          done
+
+      - name: List package files
+        run: |
+          find npm/package -maxdepth 3 -type f -print
+
+      - name: Pack (npm pack)
+        working-directory: npm/package
+        run: npm pack
+
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: npm/package/*.tgz
+
+      - name: Publish to npm (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: npm/package
+        run: npm publish --access public
+
+

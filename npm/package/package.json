@@ -1,0 +1,24 @@
+{
+  "name": "@vishyfishy2/terminalfont-detect",
+  "version": "0.1.0",
+  "description": "Cross-platform terminal font detector using fastfetch",
+  "license": "MIT",
+  "main": "index.js",
+  "bin": {
+    "terminalfont-detect": "cli.js"
+  },
+  "files": [
+    "bin/",
+    "index.js",
+    "cli.js"
+  ],
+  "keywords": [
+    "terminal",
+    "font",
+    "detect",
+    "fastfetch"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}
