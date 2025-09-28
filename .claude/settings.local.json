@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(bunx:*)"
+      "Bash(bunx:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run cancel:*)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,31 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@vishyfishy2/terminalfont-detect",
+      "optionalDependencies": {
+        "@vishyfishy2/terminalfont-detect-darwin-arm64": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-darwin-x64": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-linux-arm64-gnu": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-linux-arm64-musl": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-linux-x64-gnu": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-linux-x64-musl": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-win32-arm64": "^0.1.4",
+        "@vishyfishy2/terminalfont-detect-win32-x64": "^0.1.4",
+      },
+    },
+  },
+  "packages": {
+    "@vishyfishy2/terminalfont-detect-darwin-arm64": ["@vishyfishy2/terminalfont-detect-darwin-arm64@0.1.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-KUNS1ogzjrUSgaHV59KGTTbLH0IACwpk44hZxnmb8csv3bxorJsrv6OpEvJadEM9eliG+1jmXB0LcoHs7sBcCQ=="],
+
+    "@vishyfishy2/terminalfont-detect-linux-arm64-gnu": ["@vishyfishy2/terminalfont-detect-linux-arm64-gnu@0.1.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-PySU30TpK5aYEHmdarNNBTu2G1bdsTPb8MZ7wb+5atX0eq1Tiay3L0WKJ5gTgFKVVHmBNU6O/KpSiUnRs20opQ=="],
+
+    "@vishyfishy2/terminalfont-detect-linux-arm64-musl": ["@vishyfishy2/terminalfont-detect-linux-arm64-musl@0.1.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-OBbW5eQUDgCqLoNOeeMU4pa46kQew6vBr/Nn8aO3fft/Wv4LuV1bC11P0Y/1ZkJ6LzDv4oVVoEPWufKcMJmhVQ=="],
+
+    "@vishyfishy2/terminalfont-detect-linux-x64-gnu": ["@vishyfishy2/terminalfont-detect-linux-x64-gnu@0.1.4", "", { "os": "linux", "cpu": "x64" }, "sha512-347Sc7BaaLqT4kUERsbt/fPGbgrSTtSF4ymOmLdcpowAgN+AXwj1YlCdV1sl+Y4LDINamUXyc61z569mw/VoJg=="],
+
+    "@vishyfishy2/terminalfont-detect-linux-x64-musl": ["@vishyfishy2/terminalfont-detect-linux-x64-musl@0.1.4", "", { "os": "linux", "cpu": "x64" }, "sha512-zgMTykMjGGxBQ3REDZ2mGby8uk6lwDpYCb02MDE0vca52FM6uYoeitSd2zAgZBVNHdegEvZb1uHhnHhL6Zh28w=="],
+
+    "@vishyfishy2/terminalfont-detect-win32-x64": ["@vishyfishy2/terminalfont-detect-win32-x64@0.1.4", "", { "os": "win32", "cpu": "x64" }, "sha512-n9gOBQhybpSJMyWLIT4VejA57C0nFU6dE2440SAUzPvk0GMbHlLZcwn7N1M+OgemFTzjOT5k6kFicVSrUemcoA=="],
+  }
+}

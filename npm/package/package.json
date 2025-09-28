@@ -5,7 +5,8 @@
   "license": "MIT",
   "main": "index.js",
   "bin": {
-    "terminalfont-detect": "cli.js"
+    "terminalfont-detect": "cli.js",
+    "@vishyfishy2/terminalfont-detect": "cli.js"
   },
   "optionalDependencies": {
     "@vishyfishy2/terminalfont-detect-darwin-arm64": "^0.1.4",
