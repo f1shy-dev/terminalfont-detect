@@ -36,7 +36,7 @@ function detectLibc() {
 
 function tryRequirePlatformPackage() {
   const os = mapPlatformToNpm(platform);
-  const cpu = mapArchToNpm(arch());
+  const cpu = mapArchToNpm(arch);
   const libc = os === "linux" ? detectLibc() : "";
   const base = `@vishyfishy2/terminalfont-detect-${os}-${cpu}`;
   const name = libc ? `${base}-${libc}` : base;
@@ -64,7 +64,7 @@ function fallbackBundled() {
       ? "macos"
       : "linux";
   const cpu =
-    arch() === "x64" ? "x86_64" : arch() === "arm64" ? "aarch64" : arch();
+    arch === "x64" ? "x86_64" : arch === "arm64" ? "aarch64" : arch;
   const base = join(__dirname, "bin", `${os}-${cpu}`);
   const name =
     os === "windows" ? "terminalfont-detect.exe" : "terminalfont-detect";
