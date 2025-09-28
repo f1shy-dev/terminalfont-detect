@@ -207,9 +207,14 @@ jobs:
           for a in artifacts/*; do
             base=$(basename "$a")
             os=; cpu=; libc=""; suf=""
-            if [[ "$base" == *darwin* || "$base" == *macos* ]]; then os=darwin; fi
-            if [[ "$base" == *linux* ]]; then os=linux; fi
-            if [[ "$base" == *windows* || "$base" == *win* ]]; then os=win32; suf=".exe"; fi
+            if [[ "$base" == *darwin* || "$base" == *macos* ]]; then
+              os=darwin
+            elif [[ "$base" == *linux* ]]; then
+              os=linux
+            elif [[ "$base" == *windows* || "$base" == *win* ]]; then
+              os=win32
+              suf=".exe"
+            fi
             if [[ "$base" == *arm64* || "$base" == *aarch64* ]]; then cpu=arm64; else cpu=x64; fi
             if [[ "$os" == linux ]]; then
               if [[ "$base" == *musl* ]]; then libc=musl; else libc=gnu; fi
