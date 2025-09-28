@@ -197,7 +197,7 @@ jobs:
             # Write package.json using Node to avoid heredocs confusing YAML linters
             pkg_name="@vishyfishy2/terminalfont-detect-$os-$cpu$libcsuffix"
             desc="terminalfont-detect prebuilt binary ($os-$cpu$libcdesc)"
-            node -e 'const fs=require("fs"); const [out,name,os,cpu,desc]=process.argv.slice(1); const pkg={name, version:"0.1.0", description:desc, license:"MIT", main:"index.js", os:[os], cpu:[cpu], files:["bin/","index.js"]}; fs.writeFileSync(out, JSON.stringify(pkg, null, 2)+"\n");' \
+            node -e 'const fs=require("fs"); const [out,name,os,cpu,desc]=process.argv.slice(1); const pkg={name, version:"0.1.4", description:desc, license:"MIT", main:"index.js", os:[os], cpu:[cpu], files:["bin/","index.js"]}; fs.writeFileSync(out, JSON.stringify(pkg, null, 2)+"\n");' \
               "$pkgdir/package.json" "$pkg_name" "$os" "$cpu" "$desc"
 
             # Write tiny JS entry to expose binary path for meta package to require
