@@ -4,7 +4,8 @@
       "Bash(bunx:*)",
       "Bash(gh run list:*)",
       "Bash(gh run cancel:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(bun run:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,12 +1,37 @@
 {
   "name": "@vishyfishy2/terminalfont-detect",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Cross-platform terminal font detector using fastfetch",
   "license": "MIT",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.mjs",
+      "require": "./dist/cli.js"
+    }
+  },
   "bin": {
-    "terminalfont-detect": "cli.js",
-    "@vishyfishy2/terminalfont-detect": "cli.js"
+    "terminalfont-detect": "./dist/cli.js",
+    "@vishyfishy2/terminalfont-detect": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "zshy",
+    "prepublishOnly": "bun run build"
+  },
+  "zshy": {
+    "outDir": "./dist",
+    "exports": {
+      ".": "./src/index.ts",
+      "./cli": "./src/cli.ts"
+    }
   },
   "optionalDependencies": {
     "@vishyfishy2/terminalfont-detect-darwin-arm64": "^0.1.4",
@@ -15,13 +40,11 @@
     "@vishyfishy2/terminalfont-detect-linux-x64-musl": "^0.1.4",
     "@vishyfishy2/terminalfont-detect-linux-arm64-gnu": "^0.1.4",
     "@vishyfishy2/terminalfont-detect-linux-arm64-musl": "^0.1.4",
-    "@vishyfishy2/terminalfont-detect-win32-x64": "^0.1.4",
-    "@vishyfishy2/terminalfont-detect-win32-arm64": "^0.1.4"
+    "@vishyfishy2/terminalfont-detect-win32-x64": "^0.1.4"
   },
   "files": [
     "bin/",
-    "index.js",
-    "cli.js"
+    "dist/"
   ],
   "keywords": [
     "terminal",
@@ -31,5 +54,10 @@
   ],
   "engines": {
     "node": ">=16"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2",
+    "zshy": "^0.4.2"
   }
 }

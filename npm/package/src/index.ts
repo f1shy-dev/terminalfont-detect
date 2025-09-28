@@ -1,20 +1,20 @@
-const { join } = require("path");
-const { platform, arch } = process;
+import { join } from "path";
+import { platform, arch } from "process";
 
-function mapArchToNpm(a) {
+function mapArchToNpm(a: string): string {
   if (a === "x64") return "x64";
   if (a === "arm64") return "arm64";
   return a;
 }
 
-function mapPlatformToNpm(p) {
+function mapPlatformToNpm(p: string): string {
   if (p === "darwin") return "darwin";
   if (p === "win32") return "win32";
   if (p === "linux") return "linux";
   return p;
 }
 
-function detectLibc() {
+function detectLibc(): string {
   if (platform === "linux") {
     try {
       const { GLIBC } = require("glibc-version") || {};
@@ -34,7 +34,7 @@ function detectLibc() {
   return "";
 }
 
-function tryRequirePlatformPackage() {
+function tryRequirePlatformPackage(): string | null {
   const os = mapPlatformToNpm(platform);
   const cpu = mapArchToNpm(arch);
   const libc = os === "linux" ? detectLibc() : "";
@@ -55,7 +55,7 @@ function tryRequirePlatformPackage() {
   return null;
 }
 
-function fallbackBundled() {
+function fallbackBundled(): string {
   // Fallback to legacy layout if present
   const os =
     platform === "win32"
@@ -71,6 +71,4 @@ function fallbackBundled() {
   return join(base, name);
 }
 
-const binaryPath = tryRequirePlatformPackage() || fallbackBundled();
-
-module.exports = { binaryPath };
+export const binaryPath = tryRequirePlatformPackage() || fallbackBundled();

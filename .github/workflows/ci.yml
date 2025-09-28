@@ -93,25 +93,38 @@ jobs:
         with:
           version: 0.15.1
 
-      - name: Build (Release)
+      - name: Build macOS targets
         shell: bash
         run: |
+          set -euxo pipefail
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
           SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
-          bunx --yes zig build -Doptimize=ReleaseFast -Dapple_sdk="$SDKROOT"
+          rm -rf dist
+          mkdir -p dist
+          # Build both arm64 and x64 macOS targets
+          for target in aarch64-macos x86_64-macos; do
+            rm -rf zig-out
+            bunx --yes zig build -Doptimize=ReleaseFast -Dtarget=$target -Dapple_sdk="$SDKROOT"
+            case "$target" in
+              aarch64-*) arch=arm64 ;;
+              x86_64-*) arch=x64 ;;
+            esac
+            outdir="dist/darwin-$arch"
+            mkdir -p "$outdir"
+            cp zig-out/bin/terminalfont-detect* "$outdir/"
+          done
 
-      - name: Derive artifact name
-        id: names
-        shell: bash
-        run: |
-          echo "os_name=macos" >> $GITHUB_OUTPUT
-          echo "arch_name=$(uname -m)" >> $GITHUB_OUTPUT
-
-      - name: Upload binary artifact
+      - name: Upload macOS arm64
         uses: actions/upload-artifact@v4
         with:
-          name: terminalfont-detect-${{ steps.names.outputs.os_name }}-${{ steps.names.outputs.arch_name }}
-          path: zig-out/bin/terminalfont-detect*
+          name: terminalfont-detect-darwin-arm64
+          path: dist/darwin-arm64/*
+
+      - name: Upload macOS x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminalfont-detect-darwin-x64
+          path: dist/darwin-x64/*
 
   build-windows:
     name: build windows
@@ -170,6 +183,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          # Read version from meta package
+          version=$(node -e 'console.log(require("./npm/package/package.json").version)')
+          
           # Create platform-specific packages
           mkdir -p npm/pkgs
           for a in artifacts/*; do
@@ -197,8 +213,8 @@ jobs:
             # Write package.json using Node to avoid heredocs confusing YAML linters
             pkg_name="@vishyfishy2/terminalfont-detect-$os-$cpu$libcsuffix"
             desc="terminalfont-detect prebuilt binary ($os-$cpu$libcdesc)"
-            node -e 'const fs=require("fs"); const [out,name,os,cpu,desc]=process.argv.slice(1); const pkg={name, version:"0.1.4", description:desc, license:"MIT", main:"index.js", os:[os], cpu:[cpu], files:["bin/","index.js"]}; fs.writeFileSync(out, JSON.stringify(pkg, null, 2)+"\n");' \
-              "$pkgdir/package.json" "$pkg_name" "$os" "$cpu" "$desc"
+            node -e 'const fs=require("fs"); const [out,name,os,cpu,desc,version]=process.argv.slice(1); const pkg={name, version, description:desc, license:"MIT", main:"index.js", os:[os], cpu:[cpu], files:["bin/","index.js"]}; fs.writeFileSync(out, JSON.stringify(pkg, null, 2)+"\n");' \
+              "$pkgdir/package.json" "$pkg_name" "$os" "$cpu" "$desc" "$version"
 
             # Write tiny JS entry to expose binary path for meta package to require
             printf '%s\n' 'const { join } = require("path");' \
